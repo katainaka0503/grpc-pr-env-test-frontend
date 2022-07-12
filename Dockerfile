@@ -8,13 +8,13 @@ RUN go mod download
 
 COPY *.go ./
 
-RUN go build ./greeter_frontend/main.go
+RUN go build
 
 FROM gcr.io/distroless/base-debian10
 
 WORKDIR /
 
-COPY --from=build /main /greeter_frontend
+COPY --from=build /grpc-pr-env-test-frontend /grpc-pr-env-test-frontend
 
 EXPOSE 50052
 
