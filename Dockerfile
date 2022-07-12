@@ -6,7 +6,7 @@ COPY go.mod ./
 COPY go.sum ./
 RUN go mod download
 
-COPY *.go ./
+COPY ./ ./
 
 RUN go build
 
@@ -14,7 +14,7 @@ FROM gcr.io/distroless/base-debian10
 
 WORKDIR /
 
-COPY --from=build /grpc-pr-env-test-frontend /grpc-pr-env-test-frontend
+COPY --from=build ./grpc-pr-env-test-frontend /grpc-pr-env-test-frontend
 
 EXPOSE 50052
 
