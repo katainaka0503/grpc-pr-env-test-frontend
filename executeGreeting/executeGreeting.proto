@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+option go_package = "google.golang.org/grpc/examples/helloworld/executeGreeting";
+option java_multiple_files = true;
+option java_package = "io.grpc.examples.helloworld";
+option java_outer_classname = "HelloWorldProto";
+
+package helloworld;
+
+service ExecuteGreeting {
+  // Sends a greeting
+  rpc ExecuteGreeting (ExecuteGreetingRequest) returns (ExecuteGreetingReply) {}
+}
+
+message ExecuteGreetingRequest {}
+
+message ExecuteGreetingReply {
+  string message = 1;
+}
