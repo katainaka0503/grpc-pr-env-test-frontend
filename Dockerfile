@@ -8,7 +8,7 @@ RUN go mod download
 
 COPY . .
 
-RUN go build
+RUN go build -o grpc-pr-env-test-frontend
 
 FROM gcr.io/distroless/base-debian10
 
