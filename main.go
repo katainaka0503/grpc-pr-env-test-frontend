@@ -41,7 +41,7 @@ const (
 
 var (
 	port = flag.Int("port", 50052, "The server port")
-	addr = flag.String("addr", "localhost:50051", "the address to connect to")
+	addr = flag.String("addr", "backend:80", "the address to connect to")
 	name = flag.String("name", defaultName, "Name to greet")
 )
 
