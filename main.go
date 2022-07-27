@@ -33,6 +33,8 @@ import (
 	pb "github.com/katainaka0503/grpc-pr-env-test-frontend/executeGreeting"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+
+	"go.opentelemetry.io/otel/baggage"
 )
 
 const (
@@ -53,6 +55,9 @@ type server struct {
 func (s *server) ExecuteGreeting(ctx context.Context, in *pb.ExecuteGreetingRequest) (*pb.ExecuteGreetingReply, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
+
+	baggage := baggage.FromContext(ctx)
+	log.Printf("Baggage: %v", baggage.Members())
 
 	r, err := s.connection.SayHello(ctx, &helloworld.HelloRequest{Name: *name})
 	if err != nil {
