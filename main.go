@@ -39,7 +39,7 @@ import (
 )
 
 const (
-	defaultName = "world"
+	defaultName = "katainaka"
 )
 
 var (
