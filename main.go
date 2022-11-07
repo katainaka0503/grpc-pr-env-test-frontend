@@ -33,6 +33,7 @@ import (
 	pb "github.com/katainaka0503/grpc-pr-env-test-frontend/executeGreeting"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 
 	"go.opentelemetry.io/otel/baggage"
 )
@@ -55,6 +56,9 @@ type server struct {
 func (s *server) ExecuteGreeting(ctx context.Context, in *pb.ExecuteGreetingRequest) (*pb.ExecuteGreetingReply, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
+
+	md, _ := metadata.FromIncomingContext(ctx)
+	log.Printf("MetaData: %v", md)
 
 	baggage := baggage.FromContext(ctx)
 	log.Printf("Baggage: %v", baggage.Members())
