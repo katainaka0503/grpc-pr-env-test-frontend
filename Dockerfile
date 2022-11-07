@@ -10,7 +10,7 @@ COPY . .
 
 RUN go build -o grpc-pr-env-test-frontend
 
-FROM gcr.io/distroless/base-debian10
+FROM golang:1.18-buster
 
 WORKDIR /
 

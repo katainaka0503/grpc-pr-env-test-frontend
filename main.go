@@ -54,6 +54,8 @@ type server struct {
 	pb.UnimplementedExecuteGreetingServer
 }
 
+var _ pb.ExecuteGreetingServer = &server{}
+
 func (s *server) ExecuteGreeting(ctx context.Context, in *pb.ExecuteGreetingRequest) (*pb.ExecuteGreetingReply, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
@@ -76,12 +78,7 @@ func (s *server) ExecuteGreeting(ctx context.Context, in *pb.ExecuteGreetingRequ
 		return nil, err
 	}
 
-	log.Printf("Member: %v", m1)
-
 	ctx = baggage.ContextWithBaggage(ctx, bg)
-
-	bg = baggage.FromContext(ctx)
-	log.Printf("New Baggage: %v", bg.Members())
 
 	r, err := s.connection.SayHello(ctx, &helloworld.HelloRequest{Name: *name})
 	if err != nil {
@@ -92,14 +89,13 @@ func (s *server) ExecuteGreeting(ctx context.Context, in *pb.ExecuteGreetingRequ
 	return &pb.ExecuteGreetingReply{Message: r.GetMessage()}, nil
 }
 
-var _ pb.ExecuteGreetingServer = &server{}
-
 func main() {
 	flag.Parse()
 
 	conn, err := grpc.Dial(*addr, grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),
 		grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()))
+
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
