@@ -72,6 +72,9 @@ func (s *server) ExecuteGreeting(ctx context.Context, in *pb.ExecuteGreetingRequ
 
 	ctx = baggage.ContextWithBaggage(ctx, bg)
 
+	bg = baggage.FromContext(ctx)
+	log.Printf("New Baggage: %v", bg.Members())
+
 	r, err := s.connection.SayHello(ctx, &helloworld.HelloRequest{Name: *name})
 	if err != nil {
 		return nil, err
