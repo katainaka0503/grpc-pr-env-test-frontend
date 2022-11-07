@@ -71,7 +71,10 @@ func (s *server) ExecuteGreeting(ctx context.Context, in *pb.ExecuteGreetingRequ
 		return nil, err
 	}
 
-	bg.SetMember(m1)
+	bg, err = bg.SetMember(m1)
+	if err != nil {
+		return nil, err
+	}
 
 	log.Printf("Member: %v", m1)
 
