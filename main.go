@@ -80,6 +80,9 @@ func (s *server) ExecuteGreeting(ctx context.Context, in *pb.ExecuteGreetingRequ
 
 	ctx = baggage.ContextWithBaggage(ctx, bg)
 
+	md, _ = metadata.FromOutgoingContext(ctx)
+	log.Printf("Outgoing MetaData: %v", md)
+
 	r, err := s.connection.SayHello(ctx, &helloworld.HelloRequest{Name: *name})
 	if err != nil {
 		return nil, err
