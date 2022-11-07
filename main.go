@@ -66,9 +66,14 @@ func (s *server) ExecuteGreeting(ctx context.Context, in *pb.ExecuteGreetingRequ
 
 	branch := strings.Replace(md.Get("baggage")[0], "branch=", "", -1)
 
-	m1, _ := baggage.NewMember("branch", branch)
+	m1, err := baggage.NewMember("branch", branch)
+	if err != nil {
+		return nil, err
+	}
 
 	bg.SetMember(m1)
+
+	log.Printf("Member: %v", m1)
 
 	ctx = baggage.ContextWithBaggage(ctx, bg)
 
