@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"strings"
 	"time"
 
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -60,8 +61,17 @@ func (s *server) ExecuteGreeting(ctx context.Context, in *pb.ExecuteGreetingRequ
 	md, _ := metadata.FromIncomingContext(ctx)
 	log.Printf("MetaData: %v", md)
 
-	baggage := baggage.FromContext(ctx)
-	log.Printf("Baggage: %v", baggage.Members())
+	bg := baggage.FromContext(ctx)
+	log.Printf("Baggage: %v", bg.Members())
+
+	branch := strings.Replace(md.Get("baggage")[0], "branch=", "", -1)
+
+	m1, _ := baggage.NewMember("branch", branch)
+
+	bg.SetMember(m1)
+	bg, _ = baggage.New(m1)
+
+	ctx = baggage.ContextWithBaggage(ctx, bg)
 
 	r, err := s.connection.SayHello(ctx, &helloworld.HelloRequest{Name: *name})
 	if err != nil {
