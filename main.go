@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/otel"
 
 	helloworld "github.com/katainaka0503/grpc-pr-env-test-backend/helloworld"
 	pb "github.com/katainaka0503/grpc-pr-env-test-frontend/executeGreeting"
@@ -37,6 +38,7 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"go.opentelemetry.io/otel/baggage"
+	"go.opentelemetry.io/otel/propagation"
 )
 
 const (
@@ -80,9 +82,6 @@ func (s *server) ExecuteGreeting(ctx context.Context, in *pb.ExecuteGreetingRequ
 
 	ctx = baggage.ContextWithBaggage(ctx, bg)
 
-	md, _ = metadata.FromOutgoingContext(ctx)
-	log.Printf("Outgoing MetaData: %v", md)
-
 	r, err := s.connection.SayHello(ctx, &helloworld.HelloRequest{Name: *name})
 	if err != nil {
 		return nil, err
@@ -94,6 +93,8 @@ func (s *server) ExecuteGreeting(ctx context.Context, in *pb.ExecuteGreetingRequ
 
 func main() {
 	flag.Parse()
+
+	otel.SetTextMapPropagator(propagation.Baggage{})
 
 	conn, err := grpc.Dial(*addr, grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),
