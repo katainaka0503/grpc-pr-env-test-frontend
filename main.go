@@ -28,17 +28,14 @@ import (
 	"strings"
 	"time"
 
-	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
-	"go.opentelemetry.io/otel"
+	grpctrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/google.golang.org/grpc"
+	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 
 	helloworld "github.com/katainaka0503/grpc-pr-env-test-backend/helloworld"
 	pb "github.com/katainaka0503/grpc-pr-env-test-frontend/executeGreeting"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
-
-	"go.opentelemetry.io/otel/baggage"
-	"go.opentelemetry.io/otel/propagation"
 )
 
 const (
@@ -47,7 +44,7 @@ const (
 
 var (
 	port = flag.Int("port", 50052, "The server port")
-	addr = flag.String("addr", "backend:80", "the address to connect to")
+	addr = flag.String("addr", "backend-gateway:80", "the address to connect to")
 	name = flag.String("name", defaultName, "Name to greet")
 )
 
@@ -62,31 +59,44 @@ func (s *server) ExecuteGreeting(ctx context.Context, in *pb.ExecuteGreetingRequ
 	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 
-	md, _ := metadata.FromIncomingContext(ctx)
-	log.Printf("MetaData: %v", md)
-
-	bg := baggage.FromContext(ctx)
-	log.Printf("Baggage: %v", bg.Members())
-
-	branch := strings.Replace(md.Get("baggage")[0], "branch=", "", -1)
-
-	m1, err := baggage.NewMember("branch", branch)
-	if err != nil {
-		return nil, err
+	span, ok := tracer.SpanFromContext(ctx)
+	if !ok {
+		log.Printf("failed to fetch span")
 	}
 
-	bg, err = bg.SetMember(m1)
-	if err != nil {
-		return nil, err
+	md, ok := metadata.FromIncomingContext(ctx) // nil is ok
+	if !ok {
+		log.Printf("Failed to get metadata\n")
+	}
+	MDCarrier(md).ForeachKey(func(k, v string) error {
+		log.Printf("MDCarrier.MetaData: %v: %v\n", k, v)
+		return nil
+	})
+
+	if sctx, err := tracer.Extract(MDCarrier(md)); err == nil {
+		log.Printf("%#v", sctx)
+		sctx.ForeachBaggageItem(func(k, v string) bool {
+			log.Printf("MetaData: %v: %v\n", k, v)
+			return true
+		})
+	} else {
+		log.Printf(err.Error())
 	}
 
-	ctx = baggage.ContextWithBaggage(ctx, bg)
+	if !ok {
+		log.Printf("Failed to get span context\n")
+	}
+	span.Context().ForeachBaggageItem(func(k string, v string) bool {
+		log.Printf("MetaData: %v: %v\n", k, v)
+		return true
+	})
 
 	r, err := s.connection.SayHello(ctx, &helloworld.HelloRequest{Name: *name})
 	if err != nil {
+		log.Println(err.Error())
 		return nil, err
 	}
-	log.Printf("Greeting: %s", r.GetMessage())
+	log.Printf("Greeting: %s\n", r.GetMessage())
 
 	return &pb.ExecuteGreetingReply{Message: r.GetMessage()}, nil
 }
@@ -94,11 +104,13 @@ func (s *server) ExecuteGreeting(ctx context.Context, in *pb.ExecuteGreetingRequ
 func main() {
 	flag.Parse()
 
-	otel.SetTextMapPropagator(propagation.Baggage{})
+	tracer.Start()
+	defer tracer.Stop()
 
+	// InterceptorでOpenTelemetryを仕込む
 	conn, err := grpc.Dial(*addr, grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),
-		grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()))
+		grpc.WithUnaryInterceptor(grpctrace.UnaryClientInterceptor()),
+		grpc.WithStreamInterceptor(grpctrace.StreamClientInterceptor()))
 
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
@@ -110,12 +122,44 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
-	s := grpc.NewServer(grpc.UnaryInterceptor(otelgrpc.UnaryServerInterceptor()),
-		grpc.StreamInterceptor(otelgrpc.StreamServerInterceptor()))
+	s := grpc.NewServer(grpc.UnaryInterceptor(grpctrace.UnaryServerInterceptor()),
+		grpc.StreamInterceptor(grpctrace.StreamServerInterceptor()))
 
 	pb.RegisterExecuteGreetingServer(s, &server{connection: c})
 	log.Printf("server listening at %v", lis.Addr())
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}
+}
+
+type MDCarrier metadata.MD
+
+var _ tracer.TextMapWriter = (*MDCarrier)(nil)
+var _ tracer.TextMapReader = (*MDCarrier)(nil)
+
+// Get will return the first entry in the metadata at the given key.
+func (mdc MDCarrier) Get(key string) string {
+	if m := mdc[key]; len(m) > 0 {
+		return m[0]
+	}
+	return ""
+}
+
+// Set will add the given value to the values found at key. Key will be lowercased to match
+// the metadata implementation.
+func (mdc MDCarrier) Set(key, val string) {
+	k := strings.ToLower(key) // as per google.golang.org/grpc/metadata/metadata.go
+	mdc[k] = append(mdc[k], val)
+}
+
+// ForeachKey will iterate over all key/value pairs in the metadata.
+func (mdc MDCarrier) ForeachKey(handler func(key, val string) error) error {
+	for k, vs := range mdc {
+		for _, v := range vs {
+			if err := handler(k, v); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
